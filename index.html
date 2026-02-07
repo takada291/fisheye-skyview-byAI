@@ -17,18 +17,16 @@
             display: flex; flex-direction: column;
         }
 
-        /* --- 1. スタート画面 --- */
+        /* --- スタート画面 --- */
         #startScreen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #f0f4f8; color: #333; z-index: 100;
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            overflow-y: auto; /* 設定項目が多いのでスクロール許可 */
+            overflow-y: auto;
         }
         .app-title { font-size: 1.8rem; color: #2980b9; margin: 20px 0 10px 0; font-weight: bold; }
-        .app-desc { font-size: 0.8rem; color: #7f8c8d; margin-bottom: 20px; text-align: center; }
         
-        /* 設定エリア */
         .settings-area {
             background: #fff; padding: 20px; border-radius: 15px; width: 85%; max-width: 350px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px;
@@ -49,10 +47,10 @@
             transition: transform 0.1s;
         }
         .mode-btn:active { transform: scale(0.95); }
-        .btn-camera { background-color: #e67e22; color: white; } /* 注意色に変更 */
+        .btn-camera { background-color: #e67e22; color: white; }
         .btn-file { background-color: #3498db; color: white; }
 
-        /* --- 2. カメラ画面 --- */
+        /* --- カメラ画面 --- */
         #cameraContainer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 90;
@@ -64,7 +62,6 @@
         }
         #video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 北向き警告オーバーレイ */
         .north-warning {
             position: absolute; top: 20px; left: 0; width: 100%;
             text-align: center; z-index: 15; pointer-events: none;
@@ -75,7 +72,6 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.5); border: 2px solid white;
         }
 
-        /* 水準器オーバーレイ */
         .level-overlay {
             position: absolute; width: 200px; height: 200px;
             border-radius: 50%; border: 2px dashed rgba(255, 255, 255, 0.5);
@@ -114,7 +110,7 @@
             position: absolute; left: 20px; color: white; cursor: pointer; font-size: 0.9rem;
         }
 
-        /* --- 3. 解析画面 --- */
+        /* --- 解析画面 --- */
         #analysisScreen {
             display: none; flex-direction: column; height: 100%;
             background-color: #2c3e50; z-index: 80;
@@ -123,16 +119,26 @@
             flex: 1; position: relative; background: #000; overflow: hidden;
             display: flex; justify-content: center; align-items: center;
         }
-        canvas { max-width: 100%; max-height: 100%; }
-        /* 太陽軌道表示用キャンバス（重ね合わせ） */
+        
+        /* ■■■ 修正ポイント: キャンバスをまとめるラッパー ■■■ */
+        #canvasWrapper {
+            position: relative;
+            /* サイズはJSで動的に設定します */
+        }
+        
+        canvas { 
+            display: block; /* 隙間防止 */
+        }
+        #mainCanvas {
+            /* 基本キャンバス */
+        }
         #sunCanvas {
             position: absolute; top: 0; left: 0; pointer-events: none;
         }
-        
         #circleOverlay {
             position: absolute; border: 2px solid rgba(231, 76, 60, 0.8);
             border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-            pointer-events: none; display: none;
+            pointer-events: none; display: none; top: 0; left: 0; /* JSで制御 */
         }
 
         /* コントロールパネル */
@@ -156,7 +162,6 @@
         .slider-label { width: 70px; font-size: 0.8rem; font-weight: bold; }
         input[type=range] { flex: 1; }
 
-        /* 結果表示（詳細） */
         .result-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
             background: #ecf0f1; padding: 10px; border-radius: 10px; margin-top: 10px;
@@ -181,40 +186,27 @@
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🐟 AI魚眼 v3.0</div>
-        <div class="app-desc">日照・光環境解析</div>
-        
+        <div class="app-title">🐟 AI魚眼 v3.1</div>
         <div class="settings-area">
             <div class="setting-row">
                 <label class="setting-label">📍 解析地点（都道府県）</label>
-                <select id="prefSelect" onchange="updateLat()">
-                    </select>
+                <select id="prefSelect" onchange="updateLat()"></select>
             </div>
             <div class="setting-row">
                 <label class="setting-label">緯度 (手動入力可)</label>
                 <input type="number" id="latInput" step="0.1" value="36.0">
             </div>
         </div>
-
-        <button class="mode-btn btn-camera" onclick="startCameraMode()">
-            <span>📷⬆️</span> 撮影（スマホ上を北へ！）
-        </button>
-        <button class="mode-btn btn-file" onclick="document.getElementById('fileInput').click()">
-            <span>📂</span> 写真を選択
-        </button>
+        <button class="mode-btn btn-camera" onclick="startCameraMode()"><span>📷⬆️</span> 撮影（北を上に！）</button>
+        <button class="mode-btn btn-file" onclick="document.getElementById('fileInput').click()"><span>📂</span> 写真を選択</button>
     </div>
     <input type="file" id="fileInput" accept="image/*">
 
     <div id="cameraContainer">
         <div class="video-wrapper">
             <video id="video" autoplay playsinline muted></video>
-            
-            <div class="north-warning">
-                <span class="north-badge">⬆️ スマホの上を「北」へ！</span>
-            </div>
-
+            <div class="north-warning"><span class="north-badge">⬆️ スマホの上を「北」へ！</span></div>
             <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器ON</button>
-            
             <div class="level-overlay">
                 <div class="target-circle" id="targetCircle"></div>
                 <div class="bubble" id="bubble"></div>
@@ -228,9 +220,11 @@
 
     <div id="analysisScreen">
         <div class="canvas-container" id="canvasContainer">
-            <canvas id="mainCanvas"></canvas>
-            <canvas id="sunCanvas"></canvas> 
-            <div id="circleOverlay"></div>
+            <div id="canvasWrapper">
+                <canvas id="mainCanvas"></canvas>
+                <canvas id="sunCanvas"></canvas> 
+                <div id="circleOverlay"></div>
+            </div>
         </div>
 
         <div class="controls-panel">
@@ -241,18 +235,9 @@
 
             <div id="tab-lens" class="control-group active">
                 <p style="font-size:0.8rem; margin-bottom:10px; text-align:center;">赤枠を写真の円周に合わせてください</p>
-                <div class="slider-row">
-                    <span class="slider-label">サイズ</span>
-                    <input type="range" id="sizeSlider" min="10" max="100" value="80">
-                </div>
-                <div class="slider-row">
-                    <span class="slider-label">左右 X</span>
-                    <input type="range" id="xSlider" min="0" max="100" value="50">
-                </div>
-                <div class="slider-row">
-                    <span class="slider-label">上下 Y</span>
-                    <input type="range" id="ySlider" min="0" max="100" value="50">
-                </div>
+                <div class="slider-row"><span class="slider-label">サイズ</span><input type="range" id="sizeSlider" min="10" max="100" value="80"></div>
+                <div class="slider-row"><span class="slider-label">左右 X</span><input type="range" id="xSlider" min="0" max="100" value="50"></div>
+                <div class="slider-row"><span class="slider-label">上下 Y</span><input type="range" id="ySlider" min="0" max="100" value="50"></div>
                 <div style="text-align:center; margin-top:10px;">
                     <button class="sm-btn btn-recalc" onclick="switchTab('analysis')">次へ（解析実行）</button>
                 </div>
@@ -263,39 +248,24 @@
                     <span class="slider-label">2値化</span>
                     <input type="range" id="threshSlider" min="0" max="255" value="180" oninput="processImage()">
                 </div>
-                
                 <div class="result-grid">
                     <div class="res-card full-width">
                         <div class="res-val main" id="valRI">-%</div>
                         <div class="res-label">相対照度 (年平均推定)</div>
                     </div>
-                    <div class="res-card">
-                        <div class="res-val" id="valSummer">-h</div>
-                        <div class="res-label">夏至の日照時間</div>
-                    </div>
-                    <div class="res-card">
-                        <div class="res-val" id="valWinter">-h</div>
-                        <div class="res-label">冬至の日照時間</div>
-                    </div>
-                    <div class="res-card">
-                        <div class="res-val" id="valSVF">-%</div>
-                        <div class="res-label">開空度 (SVF)</div>
-                    </div>
+                    <div class="res-card"><div class="res-val" id="valSummer">-h</div><div class="res-label">夏至の日照</div></div>
+                    <div class="res-card"><div class="res-val" id="valWinter">-h</div><div class="res-label">冬至の日照</div></div>
+                    <div class="res-card"><div class="res-val" id="valSVF">-%</div><div class="res-label">開空度 (SVF)</div></div>
                 </div>
-                
                 <div style="text-align:center; font-size:0.75rem; color:#7f8c8d; margin-top:5px;">
-                    <span style="color:gold;">●</span>夏至 / <span style="color:orange;">●</span>春分秋分 / <span style="color:cyan;">●</span>冬至
+                    <span style="color:gold;">●</span>夏至 / <span style="color:orange;">●</span>春秋 / <span style="color:cyan;">●</span>冬至
                 </div>
-
-                <div class="action-btns">
-                    <button class="sm-btn btn-back" onclick="goHome()">🏠 戻る</button>
-                </div>
+                <div class="action-btns"><button class="sm-btn btn-back" onclick="goHome()">🏠 戻る</button></div>
             </div>
         </div>
     </div>
 
 <script>
-    // --- 都道府県リスト ---
     const prefectures = [
         { name: "北海道", lat: 43.06 }, { name: "青森県", lat: 40.82 }, { name: "岩手県", lat: 39.70 },
         { name: "宮城県", lat: 38.27 }, { name: "秋田県", lat: 39.72 }, { name: "山形県", lat: 38.24 },
@@ -315,37 +285,29 @@
         { name: "鹿児島", lat: 31.56 }, { name: "沖縄県", lat: 26.21 }
     ];
 
-    // --- 初期化 ---
     const prefSelect = document.getElementById('prefSelect');
     const latInput = document.getElementById('latInput');
-    
-    // リスト生成
     prefectures.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.lat;
         opt.textContent = p.name;
-        if(p.name === "福井県") opt.selected = true; // デフォルト福井
+        if(p.name === "福井県") opt.selected = true;
         prefSelect.appendChild(opt);
     });
-    // 初期値をセット
     latInput.value = prefSelect.value;
+    function updateLat() { latInput.value = prefSelect.value; }
 
-    function updateLat() {
-        latInput.value = prefSelect.value;
-    }
-
-    // Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
     }
 
-    // --- 変数 ---
     let originalImg = null; 
     let originalData = null; 
     let canvas = document.getElementById('mainCanvas');
     let ctx = canvas.getContext('2d');
     let sunCanvas = document.getElementById('sunCanvas');
     let sunCtx = sunCanvas.getContext('2d');
+    let canvasWrapper = document.getElementById('canvasWrapper');
     
     let lensParams = { x: 0.5, y: 0.5, r: 0.4 }; 
     let currentStream = null;
@@ -361,9 +323,6 @@
     const targetCircle = document.getElementById('targetCircle');
     const sensorBtn = document.getElementById('sensorBtn');
 
-    // ==========================================
-    // 1. ファイル選択 / カメラ起動
-    // ==========================================
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -390,10 +349,7 @@
         startScreen.style.display = 'none';
         cameraContainer.style.display = 'flex';
         try {
-            const constraints = {
-                video: { facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080} },
-                audio: false
-            };
+            const constraints = { video: { facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080} }, audio: false };
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = currentStream;
             isCameraRunning = true;
@@ -405,10 +361,7 @@
     }
 
     function closeCameraMode() {
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            currentStream = null;
-        }
+        if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); currentStream = null; }
         isCameraRunning = false;
         cameraContainer.style.display = 'none';
         startScreen.style.display = 'flex';
@@ -418,19 +371,14 @@
         const w = video.videoWidth;
         const h = video.videoHeight;
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = w;
-        tempCanvas.height = h;
+        tempCanvas.width = w; tempCanvas.height = h;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.drawImage(video, 0, 0, w, h);
         loadImages(tempCanvas.toDataURL('image/jpeg'));
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            currentStream = null;
-        }
+        if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); currentStream = null; }
         isCameraRunning = false;
     });
 
-    // --- 水準器 ---
     function checkSensorPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             sensorBtn.style.display = 'block';
@@ -440,16 +388,12 @@
     }
     function requestSensorPermission() {
         DeviceOrientationEvent.requestPermission().then(r => {
-            if (r === 'granted') {
-                sensorBtn.style.display = 'none';
-                window.addEventListener('deviceorientation', handleOrientation);
-            }
+            if (r === 'granted') { sensorBtn.style.display = 'none'; window.addEventListener('deviceorientation', handleOrientation); }
         });
     }
     function handleOrientation(event) {
         if (!isCameraRunning) return;
-        let x = event.gamma; 
-        let y = event.beta;
+        let x = event.gamma; let y = event.beta;
         if (Math.abs(y) > 90) { if (y > 0) y = 180 - y; else y = -180 - y; }
         let moveX = x * 1.5; let moveY = y * 1.5;
         const maxDist = 80;
@@ -459,10 +403,6 @@
         if (Math.abs(x) < 10 && Math.abs(y) < 10) targetCircle.classList.add('ok');
         else targetCircle.classList.remove('ok');
     }
-
-    // ==========================================
-    // 2. 解析・描画処理
-    // ==========================================
 
     function goHome() {
         analysisScreen.style.display = 'none';
@@ -476,19 +416,21 @@
         const ch = container.clientHeight;
         const imgRatio = originalImg.width / originalImg.height;
         const screenRatio = cw / ch;
-        
         let drawW, drawH;
         if (imgRatio > screenRatio) { drawW = cw; drawH = cw / imgRatio; }
         else { drawH = ch; drawW = ch * imgRatio; }
 
+        // ■■■ 修正: ラッパーにサイズを指定して配置を固定 ■■■
+        canvasWrapper.style.width = drawW + 'px';
+        canvasWrapper.style.height = drawH + 'px';
+
         canvas.width = drawW; canvas.height = drawH;
-        sunCanvas.width = drawW; sunCanvas.height = drawH; // 太陽軌道レイヤーも合わせる
+        sunCanvas.width = drawW; sunCanvas.height = drawH;
 
         ctx.drawImage(originalImg, 0, 0, drawW, drawH);
         originalData = ctx.getImageData(0,0, drawW, drawH);
     }
 
-    // レンズ調整UI更新
     document.getElementById('sizeSlider').addEventListener('input', updateOverlayPos);
     document.getElementById('xSlider').addEventListener('input', updateOverlayPos);
     document.getElementById('ySlider').addEventListener('input', updateOverlayPos);
@@ -505,13 +447,9 @@
         circleOverlay.style.width = (pxRadius * 2) + 'px';
         circleOverlay.style.height = (pxRadius * 2) + 'px';
         
-        const rect = canvas.getBoundingClientRect();
-        const conRect = document.getElementById('canvasContainer').getBoundingClientRect();
-        const finalLeft = (rect.left - conRect.left) + pxX;
-        const finalTop = (rect.top - conRect.top) + pxY;
-
-        circleOverlay.style.left = (finalLeft - pxRadius) + 'px';
-        circleOverlay.style.top = (finalTop - pxRadius) + 'px';
+        // ラッパー基準なので単純配置でOK
+        circleOverlay.style.left = (pxX - pxRadius) + 'px';
+        circleOverlay.style.top = (pxY - pxRadius) + 'px';
         circleOverlay.style.display = 'block';
 
         lensParams = { cx: pxX, cy: pxY, r: pxRadius };
@@ -525,7 +463,7 @@
             document.querySelectorAll('.tab')[0].classList.add('active');
             document.getElementById('tab-lens').classList.add('active');
             circleOverlay.style.display = 'block';
-            sunCtx.clearRect(0, 0, sunCanvas.width, sunCanvas.height); // 軌道消す
+            sunCtx.clearRect(0, 0, sunCanvas.width, sunCanvas.height);
             ctx.putImageData(originalData, 0, 0);
         } else {
             document.querySelectorAll('.tab')[1].classList.add('active');
@@ -534,10 +472,6 @@
             processImage();
         }
     }
-
-    // ==========================================
-    // 3. 太陽軌道計算 & 解析ロジック
-    // ==========================================
 
     function processImage() {
         if (!originalData) return;
@@ -553,7 +487,6 @@
         const cy = lensParams.cy;
         const rMax = lensParams.r;
 
-        // 2値化 & SVF計算
         let skyScore = 0;
         let maxScore = 0;
         
@@ -569,7 +502,6 @@
                 }
 
                 const lum = 0.299*src[i] + 0.587*src[i+1] + 0.114*src[i+2];
-                // SVF重み (天頂角 theta)
                 const theta = (dist / rMax) * (Math.PI / 2);
                 const weight = Math.sin(theta) * Math.cos(theta);
                 maxScore += weight;
@@ -583,154 +515,80 @@
             }
         }
         ctx.putImageData(out, 0, 0);
-        
-        // SVF表示
         const svf = (skyScore / maxScore) * 100;
         document.getElementById('valSVF').textContent = svf.toFixed(1) + '%';
 
-        // ----------------------------------------
-        // 日照・相対照度計算 (Sun Tracks)
-        // ----------------------------------------
         const lat = parseFloat(document.getElementById('latInput').value);
-        
-        // 3つの季節の軌道計算: 0=冬至, 1=春分秋分, 2=夏至
-        // 赤緯(deg): 冬至=-23.4, 春秋=0, 夏至=+23.4
         const declinations = [-23.4, 0, 23.4];
         const colors = ['cyan', 'orange', 'gold'];
-        const results = []; // 各季節の { totalPoints, skyPoints, accumIntensity }
+        const results = [];
 
         sunCtx.clearRect(0, 0, sunCanvas.width, sunCanvas.height);
         
-        // 元画像(2値化済み)の判定用配列作成 (アクセス高速化)
-        // dst[] は赤(255,0,0)か元画像色になっている。赤なら空。
-        // ※dstはcanvasにput済みなので、そこから判定可能だが、配列インデックス計算でいく。
-
         declinations.forEach((dec, idx) => {
             let total = 0;
             let sky = 0;
             let weightedSky = 0;
             let weightedTotal = 0;
             
-            // 時間ごとの太陽位置をプロット (6:00 - 18:00)
             sunCtx.beginPath();
             sunCtx.strokeStyle = colors[idx];
             sunCtx.lineWidth = 3;
             let first = true;
 
-            // 15分刻み
             for (let t = 5; t <= 19; t += 0.25) {
                 const pos = getSunPos(lat, dec, t);
-                if (pos.alt <= 0) continue; // 地平線以下
+                if (pos.alt <= 0) continue; 
 
-                // 魚眼画像上の座標に変換
-                // 方位角(Azimuth): 南=0, 西=90, 北=180, 東=-90 ... ※天文定義と少し違うが式に合わせる
-                // ここでは getSunPos で 南=0, 西=90, 東=-90 としているので、
-                // 写真上では: 上=北, 下=南, 左=東, 右=西
-                // 北(上)基準のアングルに変換
-                // Azimuth(南0) -> 写真アングル: 南(0)は下(PI/2), 東(-90)は左(PI), 西(90)は右(0) ...いや違う
+                const r = (90 - pos.alt) / 90 * rMax; 
                 
-                // シンプルに考えます:
-                // 写真の上(y=0) = 北
-                // 写真の下(y=h) = 南
-                // 写真の左(x=0) = 東
-                // 写真の右(x=w) = 西
-                
-                // getSunPosのアジマス(A): 南=0, 東=-90, 西=90
-                // 描画角度(rad): 
-                //  南(A=0) -> 90度 (PI/2) (下方向)
-                //  東(A=-90) -> 180度 (PI) (左方向)
-                //  西(A=90) -> 0度 (0) (右方向)
-                //  北(A=180) -> 270度 (-PI/2) (上方向)
-                //  変換式: drawAngle = (A * Math.PI / 180) + Math.PI / 2;
-
-                const r = (90 - pos.alt) / 90 * rMax; // 天頂=0, 地平線=rMax
-                const angle = (pos.azi * Math.PI / 180) + Math.PI / 2;
+                // ■■■ 修正: 方位角の描画変換 (天頂視点: 北=上, 東=左) ■■■
+                // Azi(南0, 東-90) -> 描画角度: PI/2 - AziRad
+                // これにより、Azi=-90(東)が PI(左) になります。
+                const angle = Math.PI / 2 - (pos.azi * Math.PI / 180);
                 
                 const px = cx + r * Math.cos(angle);
                 const py = cy + r * Math.sin(angle);
 
-                // 描画
                 if (first) { sunCtx.moveTo(px, py); first = false; }
                 else { sunCtx.lineTo(px, py); }
 
-                // 点の判定 (空か木か)
                 if (px >= 0 && px < w && py >= 0 && py < h) {
                     const pixIdx = (Math.floor(py) * w + Math.floor(px)) * 4;
-                    // dstが赤(255,0,0)なら空
                     const isSky = (dst[pixIdx] === 255 && dst[pixIdx+1] === 0);
-                    
-                    // 相対照度のための重み (sin(高度) に比例)
-                    // ※直達光の強さは大気透過率などを無視すれば sin(h) に近似
                     const intensity = Math.sin(pos.alt * Math.PI / 180);
-
                     total++;
                     weightedTotal += intensity;
-                    
-                    if (isSky) {
-                        sky++;
-                        weightedSky += intensity;
-                    }
+                    if (isSky) { sky++; weightedSky += intensity; }
                 }
             }
             sunCtx.stroke();
             
-            // 時間の計算 (1step = 15min = 0.25h)
-            // 単純に空だったポイント数 * 0.25h
             const sunHours = sky * 0.25;
-            
-            // 相対照度成分 (この季節の) = 獲得エネルギー / 最大エネルギー
             const relativeI = (weightedTotal > 0) ? (weightedSky / weightedTotal) : 0;
-            
             results.push({ hours: sunHours, ri: relativeI });
         });
 
-        // 結果表示
         document.getElementById('valWinter').textContent = results[0].hours.toFixed(1) + 'h';
         document.getElementById('valSummer').textContent = results[2].hours.toFixed(1) + 'h';
-
-        // 年平均相対照度 (推定)
-        // 重みづけ: 夏:春秋:冬 = 1:2:1 くらいで平均化するのが簡易的
         const avgRI = (results[0].ri + results[1].ri * 2 + results[2].ri) / 4 * 100;
         document.getElementById('valRI').textContent = avgRI.toFixed(1) + '%';
     }
 
-    // 太陽位置計算 (簡易式)
-    // lat: 緯度, dec: 赤緯, t: 時刻(6.0 - 18.0)
-    // 返り値: { alt: 高度(deg), azi: 方位角(deg, 南=0, 東負, 西正) }
     function getSunPos(lat, dec, t) {
         const latRad = lat * Math.PI / 180;
         const decRad = dec * Math.PI / 180;
-        // 時角 (南中時=0, 1時間=15度)
         const hRad = (t - 12) * 15 * Math.PI / 180;
-        
-        // 高度 (sin h = sin φ sin δ + cos φ cos δ cos t)
         const sinAlt = Math.sin(latRad) * Math.sin(decRad) + Math.cos(latRad) * Math.cos(decRad) * Math.cos(hRad);
         const altRad = Math.asin(sinAlt);
-        
-        // 方位角 (sin A = cos δ sin t / cos h)
         const cosAlt = Math.cos(altRad);
         let sinAzi = Math.cos(decRad) * Math.sin(hRad) / cosAlt;
-        // クランプ
         if (sinAzi > 1) sinAzi = 1; if (sinAzi < -1) sinAzi = -1;
         let aziRad = Math.asin(sinAzi);
-        
-        // cos A = (sin h sin φ - sin δ) / (cos h cos φ) の符号で象限判定が必要だが
-        // 簡易的に、南中前後(t=12)で判定補正
-        // (厳密には春分などの真東真西の処理が必要だが、林業用近似としてこれでいく)
-        // cosAziチェック
         const cosAzi = (sinAlt * Math.sin(latRad) - Math.sin(decRad)) / (cosAlt * Math.cos(latRad));
-        if (cosAzi < 0) {
-            // 北側を通る場合 (夏至の朝夕など)
-             aziRad = Math.PI - aziRad; 
-             if (hRad < 0) aziRad = -Math.PI - Math.asin(sinAzi); // 午前
-        }
-
-        return {
-            alt: altRad * 180 / Math.PI,
-            azi: aziRad * 180 / Math.PI
-        };
+        if (cosAzi < 0) { aziRad = Math.PI - aziRad; if (hRad < 0) aziRad = -Math.PI - Math.asin(sinAzi); }
+        return { alt: altRad * 180 / Math.PI, azi: aziRad * 180 / Math.PI };
     }
-
 </script>
 </body>
 </html>
