@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fisheye-skyview-byAI-v2.0.0';
+const CACHE_NAME = 'fisheye-skyview-byAI-v3.0.0';
 const urlsToCache = [
   './',
   'index.html',
@@ -38,14 +38,3 @@ self.addEventListener('fetch', (event) => {
   );
 
 });
-
-
-
-
-
-
-
-
-
-
-
