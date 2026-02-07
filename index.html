@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI魚眼 v1.0</title>
+    <title>AI魚眼</title>
     
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <link rel="apple-touch-icon" href="icon-fish.png">
+    
     <meta name="theme-color" content="#2c3e50">
 
     <style>
@@ -32,7 +34,9 @@
             border: none; border-radius: 15px; cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: transform 0.1s;
         }
+        .mode-btn:active { transform: scale(0.95); }
         .btn-camera { background-color: #2980b9; color: white; }
         .btn-file { background-color: #8e44ad; color: white; }
 
@@ -58,12 +62,6 @@
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* 枠外を暗く */
             pointer-events: none;
             display: none; /* 調整モード時のみ表示 */
-        }
-        #circleCenter {
-            position: absolute; width: 10px; height: 10px;
-            background: red; border-radius: 50%;
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
-            display: none;
         }
 
         /* コントロールエリア */
@@ -105,14 +103,12 @@
 
         /* 隠し要素 */
         #fileInput { display: none; }
-        /* カメラ用（今回は撮影済みのものを解析するフロー推奨ですが、撮影機能も一応） */
-        #cameraVideo { display: none; } 
     </style>
 </head>
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🐟 AI魚眼 v1.0</div>
+        <div class="app-title">🐟 AI魚眼 v1.1</div>
         <div class="app-desc">全天空写真 解析ツール<br>（開空度・光環境評価）</div>
         
         <button class="mode-btn btn-camera" onclick="startCamera()">
@@ -121,14 +117,18 @@
         <button class="mode-btn btn-file" onclick="document.getElementById('fileInput').click()">
             <span>📂</span> 写真を選択
         </button>
-        <div style="margin-top:20px; font-size:0.8rem; color:#999;">レンズ取り付け位置の調整機能付き</div>
+        <div style="margin-top:20px; font-size:0.8rem; color:#999;">
+            レンズ取り付け位置の調整機能付き<br>
+            ※ホーム画面に追加してご利用ください
+        </div>
     </div>
     
     <input type="file" id="fileInput" accept="image/*">
-    <video id="cameraVideo" autoplay playsinline muted></video> <div id="analysisScreen">
+
+    <div id="analysisScreen">
         <div class="canvas-container" id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
-            <div id="circleOverlay"><div id="circleCenter"></div></div>
+            <div id="circleOverlay"></div>
         </div>
 
         <div class="controls-panel">
@@ -180,29 +180,36 @@
 
                 <div class="action-btns">
                     <button class="sm-btn btn-back" onclick="goHome()">🏠 戻る</button>
-                    </div>
+                </div>
             </div>
         </div>
     </div>
 
 <script>
+    // --- Service Worker登録 (流用OK!) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(registration) {
+                console.log('SW registered: ', registration.scope);
+            }, function(err) {
+                console.log('SW failed: ', err);
+            });
+        });
+    }
+
     // --- 変数 ---
-    let originalImg = null; // 元画像
-    let originalData = null; // 画素データ
+    let originalImg = null; 
+    let originalData = null; 
     let canvas = document.getElementById('mainCanvas');
     let ctx = canvas.getContext('2d');
-    
-    // レンズ円パラメータ (0.0 - 1.0 の比率で管理)
     let lensParams = { x: 0.5, y: 0.5, r: 0.4 }; 
     
-    // UI要素
     const startScreen = document.getElementById('startScreen');
     const analysisScreen = document.getElementById('analysisScreen');
     const circleOverlay = document.getElementById('circleOverlay');
     const fileInput = document.getElementById('fileInput');
 
     // --- 起動・ファイル読み込み ---
-    
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -211,12 +218,9 @@
         reader.readAsDataURL(file);
     });
 
-    // カメラ撮影フロー（簡易版：input captureを使うのが一番安定するため、click発火のみ）
     function startCamera() {
-        // fileInputにcapture属性をつけてクリックさせる
         fileInput.setAttribute('capture', 'environment');
         fileInput.click();
-        // 終わったらcapture属性を外しておく（ファイル選択時用）
         setTimeout(() => fileInput.removeAttribute('capture'), 1000);
     }
 
@@ -226,11 +230,7 @@
             originalImg = img;
             startScreen.style.display = 'none';
             analysisScreen.style.display = 'flex';
-            
-            // キャンバス描画
             drawOriginal();
-            
-            // UI初期化
             switchTab('lens');
             updateOverlayPos();
         };
@@ -244,15 +244,10 @@
     }
 
     // --- 描画・レンズ調整 ---
-
     function drawOriginal() {
-        // 画面サイズに合わせてリサイズ描画
-        // 縦長スマホ対応
         const container = document.getElementById('canvasContainer');
         const cw = container.clientWidth;
         const ch = container.clientHeight;
-        
-        // アスペクト比維持
         const imgRatio = originalImg.width / originalImg.height;
         const screenRatio = cw / ch;
         
@@ -266,45 +261,28 @@
         canvas.width = drawW;
         canvas.height = drawH;
         ctx.drawImage(originalImg, 0, 0, drawW, drawH);
-        
-        // 計算用データ保持（サイズはキャンバス合わせ）
         originalData = ctx.getImageData(0,0, drawW, drawH);
     }
 
-    // スライダーイベント
     document.getElementById('sizeSlider').addEventListener('input', updateOverlayPos);
     document.getElementById('xSlider').addEventListener('input', updateOverlayPos);
     document.getElementById('ySlider').addEventListener('input', updateOverlayPos);
 
     function updateOverlayPos() {
-        // スライダー値を 0.0-1.0 に変換
         const sSize = parseInt(document.getElementById('sizeSlider').value);
         const sX = parseInt(document.getElementById('xSlider').value);
         const sY = parseInt(document.getElementById('ySlider').value);
 
-        // 半径: 最大で短辺の50%
         const minSide = Math.min(canvas.width, canvas.height);
-        // size 100 => 半径 = minSide/2
-        const pxRadius = (minSide / 2) * (sSize / 100) * 1.5; // 少し余裕を持たせる係数
-
-        // 中心座標
+        const pxRadius = (minSide / 2) * (sSize / 100) * 1.5;
         const pxX = canvas.width * (sX / 100);
         const pxY = canvas.height * (sY / 100);
 
-        // オーバーレイのスタイル更新
         circleOverlay.style.width = (pxRadius * 2) + 'px';
         circleOverlay.style.height = (pxRadius * 2) + 'px';
-        circleOverlay.style.left = pxX + 'px'; // canvasコンテナ内相対配置が必要だが簡易実装として
-        // ※ canvasContainerは flex center なので、overlayをcanvas基準で配置するには工夫が必要
-        // ここではシンプルに、canvasの中心からのオフセット計算ではなく、
-        // canvasContainer内での絶対配置を行う
         
-        // 実際には canvas のオフセット + 計算値
-        const rect = canvas.getBoundingClientRect(); // 画面上のcanvas位置
-        // containerはrelative
+        const rect = canvas.getBoundingClientRect();
         const conRect = document.getElementById('canvasContainer').getBoundingClientRect();
-        
-        // canvas内の座標(pxX, pxY) を container内の座標に変換
         const finalLeft = (rect.left - conRect.left) + pxX;
         const finalTop = (rect.top - conRect.top) + pxY;
 
@@ -312,16 +290,10 @@
         circleOverlay.style.top = (finalTop - pxRadius) + 'px';
         circleOverlay.style.display = 'block';
 
-        // パラメータ保存（計算用）
-        lensParams = {
-            cx: pxX,
-            cy: pxY,
-            r: pxRadius
-        };
+        lensParams = { cx: pxX, cy: pxY, r: pxRadius };
     }
 
     // --- 解析処理 ---
-
     function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.control-group').forEach(g => g.classList.remove('active'));
@@ -330,13 +302,12 @@
             document.querySelectorAll('.tab')[0].classList.add('active');
             document.getElementById('tab-lens').classList.add('active');
             circleOverlay.style.display = 'block';
-            // 元画像に戻す
             ctx.putImageData(originalData, 0, 0);
         } else {
             document.querySelectorAll('.tab')[1].classList.add('active');
             document.getElementById('tab-analysis').classList.add('active');
-            circleOverlay.style.display = 'none'; // 枠は消す
-            processImage(); // 解析実行
+            circleOverlay.style.display = 'none';
+            processImage();
         }
     }
 
@@ -347,7 +318,6 @@
         const w = canvas.width;
         const h = canvas.height;
         
-        // 作業用データ
         const src = originalData.data;
         const out = ctx.createImageData(w, h);
         const dst = out.data;
@@ -356,49 +326,35 @@
         const cy = lensParams.cy;
         const rMax = lensParams.r;
 
-        // 集計用
-        let skyScore = 0;   // 重みづけスコア合計
-        let maxScore = 0;   // 全天が空だった場合の最大スコア
+        let skyScore = 0;
+        let maxScore = 0;
         let skyPix = 0;
         let totalPix = 0;
 
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
                 const i = (y * w + x) * 4;
-                
-                // レンズ円の内側か判定
                 const dx = x - cx;
                 const dy = y - cy;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
                 if (dist > rMax) {
-                    // 枠外：黒く塗りつぶす
                     dst[i] = 0; dst[i+1] = 0; dst[i+2] = 0; dst[i+3] = 255;
                     continue;
                 }
 
-                // 枠内：輝度判定
                 const lum = 0.299*src[i] + 0.587*src[i+1] + 0.114*src[i+2];
-                
-                // 重みづけ係数の計算 (天頂角 theta)
-                // dist / rMax = theta / (pi/2) と仮定 (等距離射影)
-                const theta = (dist / rMax) * (Math.PI / 2); // 0 ～ 90度(ラジアン)
-                
-                // 開空度(SVF)の重み = sin(theta) * cos(theta)
-                // ※微小面積要素としての重み。
-                // ドーナツ分割積分を画素単位で近似計算します。
-                const weight = Math.sin(theta) * Math.cos(theta);
+                const theta = (dist / rMax) * (Math.PI / 2); 
+                const weight = Math.sin(theta) * Math.cos(theta); // 開空度の重み
                 
                 maxScore += weight;
                 totalPix++;
 
                 if (lum > thresh) {
-                    // 空
                     dst[i] = 255; dst[i+1] = 0; dst[i+2] = 0; dst[i+3] = 255; // 赤
                     skyScore += weight;
                     skyPix++;
                 } else {
-                    // 木
                     dst[i] = src[i]; dst[i+1] = src[i+1]; dst[i+2] = src[i+2]; dst[i+3] = 255;
                 }
             }
@@ -406,10 +362,6 @@
         
         ctx.putImageData(out, 0, 0);
 
-        // 結果計算
-        // SVF = 2 * sum(weights) ... 正規化が必要
-        // ここでは単純に (skyScore / maxScore) * 100 で「全天空の何%の光が入るか」とします
-        // ※厳密なSVFは0.0-1.0ですが、わかりやすく%表示にします
         const svf = (skyScore / maxScore) * 100;
         const open = (skyPix / totalPix) * 100;
 
