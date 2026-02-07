@@ -1,4 +1,4 @@
-const CACHE_NAME = 'canopy-density-byAI-v2.0.0';
+const CACHE_NAME = 'fisheye-skyview-byAI-v1.0.0';
 const urlsToCache = [
   './',
   'index.html',
@@ -38,6 +38,7 @@ self.addEventListener('fetch', (event) => {
   );
 
 });
+
 
 
 
