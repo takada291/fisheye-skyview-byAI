@@ -60,7 +60,8 @@
             flex: 1; position: relative; overflow: hidden;
             display: flex; justify-content: center; align-items: center;
         }
-        #video { width: 100%; height: 100%; object-fit: cover; }
+        /* 修正: object-fitをcontainに変更して全画角を表示 */
+        #video { width: 100%; height: 100%; object-fit: contain; }
         
         .north-warning {
             position: absolute; top: 20px; left: 0; width: 100%;
@@ -120,7 +121,6 @@
             display: flex; justify-content: center; align-items: center;
         }
         
-        /* ■■■ 修正ポイント: キャンバスをまとめるラッパー ■■■ */
         #canvasWrapper {
             position: relative;
             /* サイズはJSで動的に設定します */
@@ -186,7 +186,7 @@
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🐟 AI魚眼 v3.1</div>
+        <div class="app-title">🐟 AI魚眼 v3.2</div>
         <div class="settings-area">
             <div class="setting-row">
                 <label class="setting-label">📍 解析地点（都道府県）</label>
@@ -349,7 +349,15 @@
         startScreen.style.display = 'none';
         cameraContainer.style.display = 'flex';
         try {
-            const constraints = { video: { facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080} }, audio: false };
+            // 修正: 16:9 (1920x1080) 指定をやめ、高解像度の正方形(4:3等)を要求してセンサー全域を取得する
+            const constraints = { 
+                video: { 
+                    facingMode: 'environment', 
+                    width: { ideal: 2160 }, 
+                    height: { ideal: 2160 } 
+                }, 
+                audio: false 
+            };
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = currentStream;
             isCameraRunning = true;
@@ -420,7 +428,6 @@
         if (imgRatio > screenRatio) { drawW = cw; drawH = cw / imgRatio; }
         else { drawH = ch; drawW = ch * imgRatio; }
 
-        // ■■■ 修正: ラッパーにサイズを指定して配置を固定 ■■■
         canvasWrapper.style.width = drawW + 'px';
         canvasWrapper.style.height = drawH + 'px';
 
@@ -447,7 +454,6 @@
         circleOverlay.style.width = (pxRadius * 2) + 'px';
         circleOverlay.style.height = (pxRadius * 2) + 'px';
         
-        // ラッパー基準なので単純配置でOK
         circleOverlay.style.left = (pxX - pxRadius) + 'px';
         circleOverlay.style.top = (pxY - pxRadius) + 'px';
         circleOverlay.style.display = 'block';
@@ -541,10 +547,6 @@
                 if (pos.alt <= 0) continue; 
 
                 const r = (90 - pos.alt) / 90 * rMax; 
-                
-                // ■■■ 修正: 方位角の描画変換 (天頂視点: 北=上, 東=左) ■■■
-                // Azi(南0, 東-90) -> 描画角度: PI/2 - AziRad
-                // これにより、Azi=-90(東)が PI(左) になります。
                 const angle = Math.PI / 2 - (pos.azi * Math.PI / 180);
                 
                 const px = cx + r * Math.cos(angle);
