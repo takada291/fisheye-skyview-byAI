@@ -60,7 +60,6 @@
             flex: 1; position: relative; overflow: hidden;
             display: flex; justify-content: center; align-items: center;
         }
-        /* 修正: object-fitをcontainに変更して全画角を表示 */
         #video { width: 100%; height: 100%; object-fit: contain; }
         
         .north-warning {
@@ -123,22 +122,14 @@
         
         #canvasWrapper {
             position: relative;
-            /* サイズはJSで動的に設定します */
         }
         
-        canvas { 
-            display: block; /* 隙間防止 */
-        }
-        #mainCanvas {
-            /* 基本キャンバス */
-        }
-        #sunCanvas {
-            position: absolute; top: 0; left: 0; pointer-events: none;
-        }
+        canvas { display: block; }
+        #sunCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
         #circleOverlay {
             position: absolute; border: 2px solid rgba(231, 76, 60, 0.8);
             border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-            pointer-events: none; display: none; top: 0; left: 0; /* JSで制御 */
+            pointer-events: none; display: none; top: 0; left: 0;
         }
 
         /* コントロールパネル */
@@ -148,9 +139,9 @@
             box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
             max-height: 50vh; overflow-y: auto;
         }
-        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
         .tab {
-            flex: 1; padding: 10px; text-align: center; cursor: pointer;
+            flex: 1; padding: 8px; text-align: center; cursor: pointer;
             font-weight: bold; color: #7f8c8d; border-bottom: 3px solid transparent;
         }
         .tab.active { color: #2980b9; border-bottom-color: #2980b9; }
@@ -158,27 +149,50 @@
         .control-group { display: none; }
         .control-group.active { display: block; }
 
-        .slider-row { display: flex; align-items: center; margin-bottom: 10px; }
-        .slider-label { width: 70px; font-size: 0.8rem; font-weight: bold; }
+        .slider-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .slider-label { width: 60px; font-size: 0.8rem; font-weight: bold; }
         input[type=range] { flex: 1; }
 
+        /* ▼▼▼ 結果表示（省スペース化） ▼▼▼ */
         .result-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-            background: #ecf0f1; padding: 10px; border-radius: 10px; margin-top: 10px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; /* 隙間を詰める */
+            background: #ecf0f1; padding: 8px; border-radius: 10px; margin-top: 5px;
         }
         .res-card {
-            background: #fff; padding: 10px; border-radius: 8px; text-align: center;
+            background: #fff; padding: 5px; border-radius: 8px; text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         .res-card.full-width { grid-column: 1 / -1; background: #e8f6f3; border: 1px solid #2ecc71; }
-        .res-val { font-size: 1.4rem; font-weight: bold; color: #2c3e50; }
-        .res-val.main { font-size: 2rem; color: #27ae60; }
-        .res-label { font-size: 0.75rem; color: #7f8c8d; margin-top: 5px; }
+        
+        /* フォントサイズを少し小さくして画面内に収める */
+        .res-val { font-size: 1.2rem; font-weight: bold; color: #2c3e50; }
+        .res-val.main { font-size: 1.6rem; color: #27ae60; }
+        .res-label { font-size: 0.7rem; color: #7f8c8d; margin-top: 3px; }
 
         .action-btns { display: flex; justify-content: space-between; margin-top: 15px; }
         .sm-btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
         .btn-back { background: #95a5a6; color: white; }
         .btn-recalc { background: #27ae60; color: white; }
+
+        /* ▼▼▼ GPSエリア ▼▼▼ */
+        .gps-section {
+            margin-top: 15px;
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+        }
+        .gps-btn {
+            background-color: #3498db;
+            color: white; border: none;
+            padding: 8px; border-radius: 8px;
+            font-size: 0.9rem; font-weight: bold;
+            cursor: pointer; width: 100%;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .gps-result {
+            margin-top: 5px; font-family: monospace; font-size: 0.8rem;
+            color: #2c3e50; background: #ecf0f1; padding: 8px;
+            border-radius: 5px; display: none; word-break: break-all;
+        }
 
         #fileInput { display: none; }
     </style>
@@ -186,7 +200,7 @@
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🐟 AI魚眼 v3.2</div>
+        <div class="app-title">🐟 AI魚眼 v3.3</div>
         <div class="settings-area">
             <div class="setting-row">
                 <label class="setting-label">📍 解析地点（都道府県）</label>
@@ -248,6 +262,7 @@
                     <span class="slider-label">2値化</span>
                     <input type="range" id="threshSlider" min="0" max="255" value="180" oninput="processImage()">
                 </div>
+                
                 <div class="result-grid">
                     <div class="res-card full-width">
                         <div class="res-val main" id="valRI">-%</div>
@@ -257,8 +272,14 @@
                     <div class="res-card"><div class="res-val" id="valWinter">-h</div><div class="res-label">冬至の日照</div></div>
                     <div class="res-card"><div class="res-val" id="valSVF">-%</div><div class="res-label">開空度 (SVF)</div></div>
                 </div>
-                <div style="text-align:center; font-size:0.75rem; color:#7f8c8d; margin-top:5px;">
+                
+                <div style="text-align:center; font-size:0.7rem; color:#7f8c8d; margin-top:3px;">
                     <span style="color:gold;">●</span>夏至 / <span style="color:orange;">●</span>春秋 / <span style="color:cyan;">●</span>冬至
+                </div>
+
+                <div class="gps-section">
+                    <button class="gps-btn" onclick="getLocation()">📍 緯度経度を取得</button>
+                    <div id="gpsResult" class="gps-result"></div>
                 </div>
                 <div class="action-btns"><button class="sm-btn btn-back" onclick="goHome()">🏠 戻る</button></div>
             </div>
@@ -308,6 +329,7 @@
     let sunCanvas = document.getElementById('sunCanvas');
     let sunCtx = sunCanvas.getContext('2d');
     let canvasWrapper = document.getElementById('canvasWrapper');
+    let gpsResult = document.getElementById('gpsResult'); // GPS用
     
     let lensParams = { x: 0.5, y: 0.5, r: 0.4 }; 
     let currentStream = null;
@@ -349,13 +371,8 @@
         startScreen.style.display = 'none';
         cameraContainer.style.display = 'flex';
         try {
-            // 修正: 16:9 (1920x1080) 指定をやめ、高解像度の正方形(4:3等)を要求してセンサー全域を取得する
             const constraints = { 
-                video: { 
-                    facingMode: 'environment', 
-                    width: { ideal: 2160 }, 
-                    height: { ideal: 2160 } 
-                }, 
+                video: { facingMode: 'environment', width: { ideal: 2160 }, height: { ideal: 2160 } }, 
                 audio: false 
             };
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -416,6 +433,8 @@
         analysisScreen.style.display = 'none';
         startScreen.style.display = 'flex';
         fileInput.value = '';
+        gpsResult.style.display = 'none';
+        gpsResult.textContent = '';
     }
 
     function drawOriginal() {
@@ -590,6 +609,35 @@
         const cosAzi = (sinAlt * Math.sin(latRad) - Math.sin(decRad)) / (cosAlt * Math.cos(latRad));
         if (cosAzi < 0) { aziRad = Math.PI - aziRad; if (hRad < 0) aziRad = -Math.PI - Math.asin(sinAzi); }
         return { alt: altRad * 180 / Math.PI, azi: aziRad * 180 / Math.PI };
+    }
+
+    // --- GPS取得 ---
+    function getLocation() {
+        gpsResult.style.display = 'block';
+        gpsResult.innerHTML = "📡 取得中...";
+
+        if (!navigator.geolocation) {
+            gpsResult.textContent = "位置情報が利用できません";
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude.toFixed(6);
+                const lng = position.coords.longitude.toFixed(6);
+                gpsResult.innerHTML = `緯度: ${lat}<br>経度: ${lng}`;
+            },
+            (error) => {
+                let errorMsg = "取得失敗";
+                switch(error.code) {
+                    case 1: errorMsg = "許可されていません"; break;
+                    case 2: errorMsg = "利用できません"; break;
+                    case 3: errorMsg = "タイムアウト"; break;
+                }
+                gpsResult.textContent = errorMsg;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     }
 </script>
 </body>
